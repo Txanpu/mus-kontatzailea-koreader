@@ -18,11 +18,11 @@ function Mus:init()
         nosotros = 0,
         ellos = 0,
     }
-    self.chicos = {
+    self.juegos = {
         nosotros = 0,
         ellos = 0,
     }
-    self.winner = nil
+    self.last_winner = nil
     self.window = nil
 
     self.ui.menu:registerToMainMenu(self)
@@ -72,55 +72,47 @@ function Mus:_closeWindow()
 end
 
 function Mus:_changeScore(side, amount)
-    if self.winner then
-        return
-    end
-
     self.scores[side] = math.max(0, math.min(self.target, self.scores[side] + amount))
 
     if self.scores[side] >= self.target then
-        self.winner = side
-        self.chicos[side] = self.chicos[side] + 1
+        -- Al ganar el juego, se suma un juego al equipo y comienza
+        -- automáticamente un nuevo tanteo para ambos equipos.
+        self.juegos[side] = self.juegos[side] + 1
+        self.scores.nosotros = 0
+        self.scores.ellos = 0
+        self.last_winner = side
+    else
+        self.last_winner = nil
     end
 
     self:show()
 end
 
-function Mus:_resetChico()
-    -- Deshacer la anotación si se reinicia después de declarar la victoria.
-    if self.winner then
-        self.chicos[self.winner] = math.max(0, self.chicos[self.winner] - 1)
-    end
-
+function Mus:_resetTantos()
+    -- Reinicia solo los tantos de la partida; conserva los juegos ganados.
     self.scores.nosotros = 0
     self.scores.ellos = 0
-    self.winner = nil
+    self.last_winner = nil
     self:show()
 end
 
 function Mus:_newGame()
     self.scores.nosotros = 0
     self.scores.ellos = 0
-    self.chicos.nosotros = 0
-    self.chicos.ellos = 0
-    self.winner = nil
-    self:show()
-end
-
-function Mus:_nextChico()
-    self.scores.nosotros = 0
-    self.scores.ellos = 0
-    self.winner = nil
+    self.juegos.nosotros = 0
+    self.juegos.ellos = 0
+    self.last_winner = nil
     self:show()
 end
 
 function Mus:_toggleTarget()
-    -- El objetivo solo se puede cambiar al empezar un chico.
-    if self.scores.nosotros ~= 0 or self.scores.ellos ~= 0 or self.winner then
+    -- El objetivo solo se puede cambiar si el tanteo está a cero.
+    if self.scores.nosotros ~= 0 or self.scores.ellos ~= 0 then
         return
     end
 
     self.target = self.target == 40 and 30 or 40
+    self.last_winner = nil
     self:show()
 end
 
@@ -132,34 +124,32 @@ function Mus:_makeTeam(side, label, content_width, button_width, button_height)
     local widgets = {
         align = "center",
         self:_makeText(label, content_width),
-        self:_makeText(string.format(_("%d puntos"), score), content_width),
+        self:_makeText(string.format(_("%d tantos"), score), content_width),
         self:_makeText(
-            string.format(_("%d amarracos, %d piedras"), amarracos, piedras),
+            string.format(_("%d amarrakos, %d piedras"), amarracos, piedras),
             content_width
         ),
     }
 
-    if not self.winner then
-        table.insert(widgets, HorizontalGroup:new({
-            align = "center",
-            self:_makeButton(_("+1 Piedra"), function()
-                self:_changeScore(side, 1)
-            end, button_width, button_height),
-            self:_makeButton(_("-1 Piedra"), function()
-                self:_changeScore(side, -1)
-            end, button_width, button_height),
-        }))
+    table.insert(widgets, HorizontalGroup:new({
+        align = "center",
+        self:_makeButton(_("+1 Piedra"), function()
+            self:_changeScore(side, 1)
+        end, button_width, button_height),
+        self:_makeButton(_("-1 Piedra"), function()
+            self:_changeScore(side, -1)
+        end, button_width, button_height),
+    }))
 
-        table.insert(widgets, HorizontalGroup:new({
-            align = "center",
-            self:_makeButton(_("+5 Amarraco"), function()
-                self:_changeScore(side, 5)
-            end, button_width, button_height),
-            self:_makeButton(_("-5 Amarraco"), function()
-                self:_changeScore(side, -5)
-            end, button_width, button_height),
-        }))
-    end
+    table.insert(widgets, HorizontalGroup:new({
+        align = "center",
+        self:_makeButton(_("+5 Amarrako"), function()
+            self:_changeScore(side, 5)
+        end, button_width, button_height),
+        self:_makeButton(_("-5 Amarrako"), function()
+            self:_changeScore(side, -5)
+        end, button_width, button_height),
+    }))
 
     return VerticalGroup:new(widgets)
 end
@@ -174,15 +164,15 @@ function Mus:show()
         align = "center",
         self:_makeText(_("Marcador de Mus"), content_width),
         self:_makeText(
-            string.format(_("Chicos — Nosotros: %d | Ellos: %d"),
-                self.chicos.nosotros, self.chicos.ellos),
+            string.format(_("Juegos — Nosotros: %d | Ellos: %d"),
+                self.juegos.nosotros, self.juegos.ellos),
             content_width
         ),
     }
 
-    if self.scores.nosotros == 0 and self.scores.ellos == 0 and not self.winner then
+    if self.scores.nosotros == 0 and self.scores.ellos == 0 then
         table.insert(widgets, self:_makeButton(
-            string.format(_("Chico a %d puntos — cambiar límite"), self.target),
+            string.format(_("Tantos a %d — cambiar límite"), self.target),
             function()
                 self:_toggleTarget()
             end,
@@ -191,24 +181,16 @@ function Mus:show()
         ))
     else
         table.insert(widgets, self:_makeText(
-            string.format(_("Chico a %d puntos"), self.target),
+            string.format(_("Tantos a %d"), self.target),
             content_width
         ))
     end
 
-    if self.winner then
-        local winner_name = self.winner == "nosotros" and _("Nosotros") or _("Ellos")
+    if self.last_winner then
+        local winner_name = self.last_winner == "nosotros" and _("Nosotros") or _("Ellos")
         table.insert(widgets, self:_makeText(
-            string.format(_("¡%s gana el chico!"), winner_name),
+            string.format(_("¡%s ha ganado un juego! Los tantos vuelven a cero."), winner_name),
             content_width
-        ))
-        table.insert(widgets, self:_makeButton(
-            _("Empezar siguiente chico"),
-            function()
-                self:_nextChico()
-            end,
-            content_width,
-            button_height
         ))
     end
 
@@ -221,8 +203,8 @@ function Mus:show()
 
     table.insert(widgets, HorizontalGroup:new({
         align = "center",
-        self:_makeButton(_("Reiniciar chico"), function()
-            self:_resetChico()
+        self:_makeButton(_("Reiniciar tantos"), function()
+            self:_resetTantos()
         end, button_width, button_height),
         self:_makeButton(_("Nueva partida"), function()
             self:_newGame()
