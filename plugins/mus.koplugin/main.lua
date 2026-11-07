@@ -1,11 +1,14 @@
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
-local VerticalGroup = require("ui/widget/container/verticalgroup")
-local HorizontalGroup = require("ui/widget/container/horizontalgroup")
+local VerticalGroup = require("ui/widget/verticalgroup")
+local HorizontalGroup = require("ui/widget/horizontalgroup")
 local CenterContainer = require("ui/widget/container/centercontainer")
+local FrameContainer = require("ui/widget/container/framecontainer")
 local TextWidget = require("ui/widget/textwidget")
 local Button = require("ui/widget/button")
 local UIManager = require("ui/uimanager")
 local Screen = require("device").screen
+local Font = require("ui/font")
+local Blitbuffer = require("ffi/blitbuffer")
 local _ = require("gettext")
 
 local Mus = WidgetContainer:extend({
@@ -49,6 +52,7 @@ end
 function Mus:_makeText(text, width)
     return TextWidget:new({
         text = text,
+        face = Font:getFace("cfont", 20),
         width = width,
     })
 end
@@ -217,7 +221,12 @@ function Mus:show()
 
     self.window = CenterContainer:new({
         dimen = Screen:getSize(),
-        child = VerticalGroup:new(widgets),
+        FrameContainer:new({
+            background = Blitbuffer.COLOR_WHITE,
+            bordersize = 2,
+            padding = 12,
+            VerticalGroup:new(widgets),
+        }),
     })
 
     UIManager:show(self.window)
