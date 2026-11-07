@@ -102,6 +102,11 @@ function Mus:_closeWindow(is_exiting)
     end
 end
 
+function Mus:_quitApp()
+    self:_closeWindow(false)
+    UIManager:quit()
+end
+
 function Mus:_changeScore(side, amount)
     local next_score = math.max(0, self.scores[side] + amount)
 
@@ -255,7 +260,7 @@ function Mus:_makeCenterBar(m)
             self:_newGame()
         end, m.btn_w_4, m.btn_ctrl_h, 2),
         self:_makeButton(_("Salir"), function()
-            self:_closeWindow(true)
+            self:_quitApp()
         end, m.btn_w_4, m.btn_ctrl_h, 2),
     })
 
